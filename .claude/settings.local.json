@@ -1,0 +1,12 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(flutter run *)",
+      "Bash(adb devices *)",
+      "Bash(adb -s 192.168.0.142:5555 shell curl -s -o /dev/null -w \"%{http_code}\" http://192.168.0.136:3000/auth/login)",
+      "Bash(dir \"d:\\\\eco-vijay-flutter\\\\eco-vijay-backend\" /a)",
+      "Bash(supabase --version)",
+      "Bash(npx supabase *)"
+    ]
+  }
+}

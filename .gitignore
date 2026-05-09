@@ -1,0 +1,17 @@
+# Backend
+eco-vijay-backend/node_modules/
+eco-vijay-backend/.env
+
+# Flutter
+eco_vijay_flutter/.dart_tool/
+eco_vijay_flutter/.flutter-plugins
+eco_vijay_flutter/.flutter-plugins-dependencies
+eco_vijay_flutter/build/
+eco_vijay_flutter/.pub-cache/
+eco_vijay_flutter/.pub/
+eco_vijay_flutter/android/.gradle/
+eco_vijay_flutter/android/local.properties
+eco_vijay_flutter/android/key.properties
+eco_vijay_flutter/**/*.g.dart
+eco_vijay_flutter/gen_icon.js
+eco_vijay_flutter/assets/icon/
