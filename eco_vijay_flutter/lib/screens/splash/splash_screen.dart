@@ -27,15 +27,15 @@ class _SplashScreenState extends State<SplashScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
+    return const Scaffold(
       backgroundColor: AppColors.background,
       body: Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            const EcoVijayLogo(size: 100),
-            const SizedBox(height: 28),
-            const Text(
+            EcoVijayLogo(size: 100),
+            SizedBox(height: 28),
+            Text(
               'Eco-Vijay',
               style: TextStyle(
                 fontSize: 32,
@@ -44,8 +44,8 @@ class _SplashScreenState extends State<SplashScreen> {
                 letterSpacing: 1.2,
               ),
             ),
-            const SizedBox(height: 6),
-            const Text(
+            SizedBox(height: 6),
+            Text(
               'EPR Compliance Sales',
               style: TextStyle(
                 fontSize: 14,
@@ -53,8 +53,8 @@ class _SplashScreenState extends State<SplashScreen> {
                 letterSpacing: 0.5,
               ),
             ),
-            const SizedBox(height: 52),
-            const CircularProgressIndicator(
+            SizedBox(height: 52),
+            CircularProgressIndicator(
               valueColor: AlwaysStoppedAnimation<Color>(AppColors.primary),
               strokeWidth: 2,
             ),

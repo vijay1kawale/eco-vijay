@@ -1,21 +1,44 @@
+import 'dart:async';
+import 'package:flutter/foundation.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:geocoding/geocoding.dart';
 
 class LocationService {
   static Future<Position?> getCurrentPosition() async {
     bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
-    if (!serviceEnabled) return null;
+    if (!serviceEnabled) {
+      debugPrint('[LocationService] Location services disabled');
+      return null;
+    }
 
     LocationPermission permission = await Geolocator.checkPermission();
     if (permission == LocationPermission.denied) {
       permission = await Geolocator.requestPermission();
-      if (permission == LocationPermission.denied) return null;
+      if (permission == LocationPermission.denied) {
+        debugPrint('[LocationService] Permission denied');
+        return null;
+      }
     }
-    if (permission == LocationPermission.deniedForever) return null;
+    if (permission == LocationPermission.deniedForever) {
+      debugPrint('[LocationService] Permission denied forever');
+      return null;
+    }
 
-    return await Geolocator.getCurrentPosition(
-      desiredAccuracy: LocationAccuracy.high,
-    );
+    // geolocator 11.x: getCurrentPosition uses desiredAccuracy + timeLimit
+    try {
+      final pos = await Geolocator.getCurrentPosition(
+        desiredAccuracy: LocationAccuracy.high,
+        timeLimit: const Duration(seconds: 15),
+      );
+      debugPrint('[LocationService] Got position: ${pos.latitude}, ${pos.longitude}');
+      return pos;
+    } on TimeoutException {
+      debugPrint('[LocationService] GPS timed out — falling back to last known');
+      return await Geolocator.getLastKnownPosition();
+    } catch (e) {
+      debugPrint('[LocationService] getCurrentPosition error: $e — falling back');
+      return await Geolocator.getLastKnownPosition();
+    }
   }
 
   static Future<String> getCityFromCoords(double lat, double lng) async {

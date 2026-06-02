@@ -2,6 +2,12 @@
 eco-vijay-backend/node_modules/
 eco-vijay-backend/.env
 
+# Admin Web (Next.js)
+admin-web/node_modules/
+admin-web/.next/
+admin-web/.env.local
+admin-web/dist/
+
 # Flutter
 eco_vijay_flutter/.dart_tool/
 eco_vijay_flutter/.flutter-plugins

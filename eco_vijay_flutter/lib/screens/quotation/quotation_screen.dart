@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../theme/app_theme.dart';
 import '../../services/api_service.dart';
+import '../../services/pdf_service.dart';
 import '../../models/company_model.dart';
 import '../../utils/constants.dart';
 
@@ -21,12 +22,35 @@ class _QuotationScreenState extends State<QuotationScreen> {
   bool _sendWhatsApp = true;
   bool _sendSms = false;
   bool _loading = false;
+  bool _pdfLoading = false;
+
+  // User info for PDF
+  String _agentName = 'Field Agent';
+  String _agentPhone = '';
+
+  @override
+  void initState() {
+    super.initState();
+    _loadUserInfo();
+  }
 
   @override
   void dispose() {
     _priceController.dispose();
     _notesController.dispose();
     super.dispose();
+  }
+
+  Future<void> _loadUserInfo() async {
+    try {
+      final data = await ApiService.get('/users/me');
+      if (mounted) {
+        setState(() {
+          _agentName = data['name'] ?? 'Field Agent';
+          _agentPhone = data['phone'] ?? '';
+        });
+      }
+    } catch (_) {}
   }
 
   Future<void> _send() async {
@@ -77,6 +101,60 @@ class _QuotationScreenState extends State<QuotationScreen> {
     }
   }
 
+  Future<void> _downloadPdf() async {
+    if (!_formKey.currentState!.validate()) return;
+
+    final priceText = _priceController.text.trim();
+    final price = double.tryParse(priceText);
+    if (price == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Enter a valid price first')),
+      );
+      return;
+    }
+    if (_selectedService == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Select a service type first')),
+      );
+      return;
+    }
+
+    setState(() => _pdfLoading = true);
+    try {
+      final path = await PdfService.generateQuotation(
+        company: widget.company,
+        serviceType: _selectedService!,
+        price: price,
+        agentName: _agentName,
+        agentPhone: _agentPhone,
+        notes: _notesController.text.trim().isNotEmpty
+            ? _notesController.text.trim()
+            : null,
+      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('PDF saved: $path'),
+            backgroundColor: AppColors.success,
+            duration: const Duration(seconds: 4),
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+                'PDF generation failed: ${e.toString().replaceFirst('Exception: ', '')}'),
+            backgroundColor: AppColors.danger,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _pdfLoading = false);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -96,11 +174,13 @@ class _QuotationScreenState extends State<QuotationScreen> {
                 decoration: BoxDecoration(
                   color: AppColors.primary.withOpacity(0.06),
                   borderRadius: BorderRadius.circular(10),
-                  border: Border.all(color: AppColors.primary.withOpacity(0.2)),
+                  border: Border.all(
+                      color: AppColors.primary.withOpacity(0.2)),
                 ),
                 child: Row(
                   children: [
-                    const Icon(Icons.business, color: AppColors.primary, size: 20),
+                    const Icon(Icons.business,
+                        color: AppColors.primary, size: 20),
                     const SizedBox(width: 10),
                     Expanded(
                       child: Text(
@@ -125,26 +205,33 @@ class _QuotationScreenState extends State<QuotationScreen> {
                       color: AppColors.textSecondary),
                 ),
                 items: AppConstants.serviceTypes
-                    .map((s) => DropdownMenuItem(value: s, child: Text(s)))
+                    .map((s) =>
+                        DropdownMenuItem(value: s, child: Text(s)))
                     .toList(),
-                onChanged: (v) => setState(() => _selectedService = v),
-                validator: (v) => v == null ? 'Select a service type' : null,
+                onChanged: (v) =>
+                    setState(() => _selectedService = v),
+                validator: (v) =>
+                    v == null ? 'Select a service type' : null,
               ),
               const SizedBox(height: 16),
 
               // Price
               TextFormField(
                 controller: _priceController,
-                keyboardType:
-                    const TextInputType.numberWithOptions(decimal: true),
+                keyboardType: const TextInputType.numberWithOptions(
+                    decimal: true),
                 decoration: const InputDecoration(
                   labelText: 'Price (₹)',
                   prefixIcon: Icon(Icons.currency_rupee_outlined,
                       color: AppColors.textSecondary),
                 ),
                 validator: (v) {
-                  if (v == null || v.trim().isEmpty) return 'Price is required';
-                  if (double.tryParse(v.trim()) == null) return 'Enter a valid amount';
+                  if (v == null || v.trim().isEmpty) {
+                    return 'Price is required';
+                  }
+                  if (double.tryParse(v.trim()) == null) {
+                    return 'Enter a valid amount';
+                  }
                   return null;
                 },
               ),
@@ -180,25 +267,29 @@ class _QuotationScreenState extends State<QuotationScreen> {
                 icon: Icons.email_outlined,
                 label: 'Email',
                 value: _sendEmail,
-                onChanged: (v) => setState(() => _sendEmail = v),
+                onChanged: (v) =>
+                    setState(() => _sendEmail = v),
                 color: AppColors.accent,
               ),
               _ChannelToggle(
                 icon: Icons.chat_outlined,
                 label: 'WhatsApp',
                 value: _sendWhatsApp,
-                onChanged: (v) => setState(() => _sendWhatsApp = v),
+                onChanged: (v) =>
+                    setState(() => _sendWhatsApp = v),
                 color: AppColors.success,
               ),
               _ChannelToggle(
                 icon: Icons.sms_outlined,
                 label: 'SMS',
                 value: _sendSms,
-                onChanged: (v) => setState(() => _sendSms = v),
+                onChanged: (v) =>
+                    setState(() => _sendSms = v),
                 color: AppColors.warning,
               ),
               const SizedBox(height: 28),
 
+              // Send button
               ElevatedButton.icon(
                 onPressed: _loading ? null : _send,
                 icon: _loading
@@ -210,6 +301,31 @@ class _QuotationScreenState extends State<QuotationScreen> {
                     : const Icon(Icons.send_outlined, size: 18),
                 label: const Text('Send Quotation'),
               ),
+
+              const SizedBox(height: 12),
+
+              // Download PDF button
+              OutlinedButton.icon(
+                onPressed: _pdfLoading ? null : _downloadPdf,
+                icon: _pdfLoading
+                    ? const SizedBox(
+                        width: 16,
+                        height: 16,
+                        child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: AppColors.primary))
+                    : const Icon(Icons.picture_as_pdf_outlined, size: 18),
+                label: const Text('Download PDF'),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: AppColors.primary,
+                  side: const BorderSide(color: AppColors.primary),
+                  minimumSize: const Size(double.infinity, 52),
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12)),
+                ),
+              ),
+
+              const SizedBox(height: 20),
             ],
           ),
         ),
@@ -238,21 +354,28 @@ class _ChannelToggle extends StatelessWidget {
     return Container(
       margin: const EdgeInsets.only(bottom: 8),
       decoration: BoxDecoration(
-        color: value ? color.withOpacity(0.06) : AppColors.cardBg,
+        color: value
+            ? color.withOpacity(0.06)
+            : AppColors.cardBg,
         borderRadius: BorderRadius.circular(10),
         border: Border.all(
-            color: value ? color.withOpacity(0.4) : AppColors.border),
+            color: value
+                ? color.withOpacity(0.4)
+                : AppColors.border),
       ),
       child: SwitchListTile(
         value: value,
         onChanged: onChanged,
-        secondary: Icon(icon, color: value ? color : AppColors.textSecondary),
+        secondary: Icon(icon,
+            color: value ? color : AppColors.textSecondary),
         title: Text(
           label,
           style: TextStyle(
             fontSize: 14,
             fontWeight: FontWeight.w500,
-            color: value ? AppColors.textPrimary : AppColors.textSecondary,
+            color: value
+                ? AppColors.textPrimary
+                : AppColors.textSecondary,
           ),
         ),
         activeColor: color,

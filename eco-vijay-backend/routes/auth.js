@@ -7,10 +7,10 @@ const router = express.Router();
 
 const DEMO_USER = {
   id: 'demo-0000-0000-0000-000000000000',
-  name: 'Demo User',
+  name: 'Demo Field Agent',
   email: 'demo@ecovijay.com',
   phone: '9999999999',
-  role: 'admin',
+  role: 'field_agent',
   password: 'demo1234',
 };
 
@@ -26,7 +26,7 @@ router.post('/login', async (req, res) => {
   if (email.toLowerCase().trim() === DEMO_USER.email && password === DEMO_USER.password) {
     const token = jwt.sign(
       { id: DEMO_USER.id, email: DEMO_USER.email, role: DEMO_USER.role, name: DEMO_USER.name },
-      process.env.JWT_SECRET,
+      process.env.JWT_SECRET || 'demo-local-secret', // FIXED: fallback secret
       { expiresIn: '30d' }
     );
     return res.json({
@@ -48,16 +48,26 @@ router.post('/login', async (req, res) => {
     }
 
     const user = users[0];
+
+    // FIXED: check is_active before authenticating
+    if (user.is_active === false) {
+      return res.status(403).json({ error: 'Your account is deactivated. Please contact admin.' });
+    }
+
     const passwordMatch = await bcrypt.compare(password, user.password_hash);
     if (!passwordMatch) {
       return res.status(401).json({ error: 'Invalid email or password' });
     }
 
+    // FIXED: fallback JWT_SECRET + update last_login
     const token = jwt.sign(
       { id: user.id, email: user.email, role: user.role, name: user.name },
-      process.env.JWT_SECRET,
+      process.env.JWT_SECRET || 'demo-local-secret',
       { expiresIn: '30d' }
     );
+
+    // FIXED: update last_login timestamp on successful login
+    await supabase.from('users').update({ last_login: new Date().toISOString() }).eq('id', user.id);
 
     return res.json({
       token,

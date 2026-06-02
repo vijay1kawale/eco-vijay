@@ -20,23 +20,23 @@ class _MapScreenState extends State<MapScreen> {
   Position? _currentPosition;
   String _currentArea = 'Locating...';
   List<CompanyModel> _nearbyCompanies = [];
+  List<CompanyModel> _allCompanies = [];
   Set<Marker> _markers = {};
   bool _loading = true;
   final TextEditingController _searchController = TextEditingController();
   List<CompanyModel> _searchResults = [];
-  bool _searching = false;
   final DraggableScrollableController _sheetController =
       DraggableScrollableController();
 
   @override
   void initState() {
     super.initState();
-    // Listen for permission grant signal from HomeScaffold
     widget.locationGranted?.addListener(_onLocationGranted);
-    // If permission already granted when screen loads, fetch immediately
     if (widget.locationGranted?.value == true) {
       _initLocation();
     }
+    // Always load all companies for the map even before location is known
+    _loadAllCompanies();
   }
 
   @override
@@ -70,49 +70,77 @@ class _MapScreenState extends State<MapScreen> {
       _currentPosition = position;
       _currentArea = area;
     });
-    // Move camera to user's current location
     _mapController?.animateCamera(
       CameraUpdate.newLatLngZoom(
         LatLng(position.latitude, position.longitude),
-        14,
+        10,
       ),
     );
     await _loadNearbyCompanies();
   }
 
+  Future<void> _loadAllCompanies() async {
+    try {
+      final data = await ApiService.get('/companies');
+      if (!mounted) return;
+      final companies =
+          (data as List).map((e) => CompanyModel.fromJson(e)).toList();
+      setState(() {
+        _allCompanies = companies;
+        _markers = _buildMarkers();
+        _loading = false;
+      });
+    } catch (e) {
+      if (mounted) setState(() => _loading = false);
+    }
+  }
+
   Future<void> _loadNearbyCompanies() async {
     if (_currentPosition == null) return;
-    setState(() => _loading = true);
     try {
       final data = await ApiService.get(
         '/companies/nearby?lat=${_currentPosition!.latitude}'
         '&lng=${_currentPosition!.longitude}'
-        '&radius=10',
+        '&radius=70',
       );
+      if (!mounted) return;
       final companies =
           (data as List).map((e) => CompanyModel.fromJson(e)).toList();
       setState(() {
         _nearbyCompanies = companies;
-        _markers = _buildMarkers(companies);
-        _loading = false;
+        _markers = _buildMarkers();
       });
     } catch (e) {
-      setState(() => _loading = false);
+      // nearby failed – map still shows all companies
     }
   }
 
-  Set<Marker> _buildMarkers(List<CompanyModel> companies) {
-    return companies
+  Set<Marker> _buildMarkers() {
+    final nearbyIds = _nearbyCompanies.map((c) => c.id).toSet();
+
+    // Merge: start with all companies, override with nearby (which have distance)
+    final Map<String, CompanyModel> byId = {
+      for (final c in _allCompanies) c.id: c,
+      for (final c in _nearbyCompanies) c.id: c,
+    };
+
+    return byId.values
         .where((c) => c.latitude != null && c.longitude != null)
         .map((c) {
+      final isNearby = nearbyIds.contains(c.id);
       return Marker(
         markerId: MarkerId(c.id),
         position: LatLng(c.latitude!, c.longitude!),
         icon: BitmapDescriptor.defaultMarkerWithHue(
-            _hueForLeadStatus(c.leadStatus)),
+          isNearby
+              ? _hueForLeadStatus(c.leadStatus)
+              : BitmapDescriptor.hueAzure,
+        ),
         infoWindow: InfoWindow(
           title: c.name,
-          snippet: c.leadStatus ?? 'No status',
+          snippet: isNearby && c.distanceKm != null
+              ? '${c.distanceKm!.toStringAsFixed(1)} km away'
+              : c.city ?? '',
           onTap: () => _openCompany(c),
         ),
       );
@@ -134,7 +162,7 @@ class _MapScreenState extends State<MapScreen> {
       case 'lost':
         return BitmapDescriptor.hueRed;
       default:
-        return BitmapDescriptor.hueAzure;
+        return BitmapDescriptor.hueOrange;
     }
   }
 
@@ -142,20 +170,18 @@ class _MapScreenState extends State<MapScreen> {
     if (query.trim().isEmpty) {
       setState(() {
         _searchResults = [];
-        _searching = false;
       });
       return;
     }
-    setState(() => _searching = true);
     try {
-      final data =
-          await ApiService.get('/companies?search=${Uri.encodeComponent(query.trim())}');
+      final data = await ApiService.get(
+          '/companies?search=${Uri.encodeComponent(query.trim())}');
+      if (!mounted) return;
       setState(() {
         _searchResults =
             (data as List).map((e) => CompanyModel.fromJson(e)).toList();
       });
     } catch (_) {}
-    setState(() => _searching = false);
   }
 
   void _openCompany(CompanyModel company) {
@@ -163,6 +189,27 @@ class _MapScreenState extends State<MapScreen> {
       context,
       MaterialPageRoute(
         builder: (_) => CompanyDetailScreen(companyId: company.id),
+      ),
+    );
+  }
+
+  void _fitAllMarkers() {
+    if (_markers.isEmpty || _mapController == null) return;
+    double minLat = 90, maxLat = -90, minLng = 180, maxLng = -180;
+    for (final m in _markers) {
+      final pos = m.position;
+      if (pos.latitude < minLat) minLat = pos.latitude;
+      if (pos.latitude > maxLat) maxLat = pos.latitude;
+      if (pos.longitude < minLng) minLng = pos.longitude;
+      if (pos.longitude > maxLng) maxLng = pos.longitude;
+    }
+    _mapController!.animateCamera(
+      CameraUpdate.newLatLngBounds(
+        LatLngBounds(
+          southwest: LatLng(minLat - 0.5, minLng - 0.5),
+          northeast: LatLng(maxLat + 0.5, maxLng + 0.5),
+        ),
+        60,
       ),
     );
   }
@@ -178,8 +225,15 @@ class _MapScreenState extends State<MapScreen> {
         children: [
           // Map
           GoogleMap(
-            onMapCreated: (c) => _mapController = c,
-            initialCameraPosition: CameraPosition(target: initialTarget, zoom: 13),
+            onMapCreated: (c) {
+              _mapController = c;
+              // Fit all markers once map is ready
+              if (_markers.isNotEmpty) {
+                Future.delayed(const Duration(milliseconds: 300), _fitAllMarkers);
+              }
+            },
+            initialCameraPosition:
+                CameraPosition(target: initialTarget, zoom: 5),
             myLocationEnabled: true,
             myLocationButtonEnabled: false,
             markers: _markers,
@@ -237,16 +291,34 @@ class _MapScreenState extends State<MapScreen> {
                         onChanged: _search,
                         decoration: const InputDecoration(
                           hintText: 'Search companies...',
-                          hintStyle:
-                              TextStyle(fontSize: 13, color: AppColors.textSecondary),
-                          prefixIcon:
-                              Icon(Icons.search, color: AppColors.textSecondary, size: 20),
+                          hintStyle: TextStyle(
+                              fontSize: 13, color: AppColors.textSecondary),
+                          prefixIcon: Icon(Icons.search,
+                              color: AppColors.textSecondary, size: 20),
                           border: InputBorder.none,
-                          contentPadding:
-                              EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                          contentPadding: EdgeInsets.symmetric(
+                              horizontal: 12, vertical: 10),
                         ),
                         style: const TextStyle(fontSize: 13),
                       ),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  // Fit-all button
+                  GestureDetector(
+                    onTap: _fitAllMarkers,
+                      child: Container(
+                      width: 40,
+                      height: 40,
+                      decoration: const BoxDecoration(
+                        color: Colors.white,
+                        shape: BoxShape.circle,
+                        boxShadow: [
+                          BoxShadow(color: Colors.black12, blurRadius: 6)
+                        ],
+                      ),
+                      child: const Icon(Icons.fit_screen,
+                          color: AppColors.primary, size: 20),
                     ),
                   ),
                 ],
@@ -258,7 +330,7 @@ class _MapScreenState extends State<MapScreen> {
           if (_searchResults.isNotEmpty)
             SafeArea(
               child: Padding(
-                padding: const EdgeInsets.only(top: 62, left: 80, right: 12),
+                padding: const EdgeInsets.only(top: 62, left: 80, right: 60),
                 child: Container(
                   constraints: const BoxConstraints(maxHeight: 250),
                   decoration: BoxDecoration(
@@ -304,8 +376,11 @@ class _MapScreenState extends State<MapScreen> {
               return Container(
                 decoration: const BoxDecoration(
                   color: Colors.white,
-                  borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-                  boxShadow: [BoxShadow(color: Colors.black12, blurRadius: 10)],
+                  borderRadius:
+                      BorderRadius.vertical(top: Radius.circular(20)),
+                  boxShadow: [
+                    BoxShadow(color: Colors.black12, blurRadius: 10)
+                  ],
                 ),
                 child: Column(
                   children: [
@@ -331,7 +406,7 @@ class _MapScreenState extends State<MapScreen> {
                               color: AppColors.textPrimary,
                             ),
                           ),
-                          const SizedBox(width: 8),
+                          const SizedBox(width: 6),
                           Container(
                             padding: const EdgeInsets.symmetric(
                                 horizontal: 8, vertical: 2),
@@ -347,6 +422,13 @@ class _MapScreenState extends State<MapScreen> {
                                   fontWeight: FontWeight.w600),
                             ),
                           ),
+                          const Spacer(),
+                          Text(
+                            'within 70 km  •  ${_allCompanies.length} total',
+                            style: const TextStyle(
+                                fontSize: 11,
+                                color: AppColors.textSecondary),
+                          ),
                         ],
                       ),
                     ),
@@ -357,10 +439,36 @@ class _MapScreenState extends State<MapScreen> {
                                   valueColor: AlwaysStoppedAnimation<Color>(
                                       AppColors.primary)))
                           : _nearbyCompanies.isEmpty
-                              ? const Center(
-                                  child: Text('No companies found nearby',
-                                      style:
-                                          TextStyle(color: AppColors.textSecondary)))
+                              ? Center(
+                                  child: Column(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      const Icon(Icons.location_off,
+                                          size: 40,
+                                          color: AppColors.textSecondary),
+                                      const SizedBox(height: 8),
+                                      Text(
+                                        _currentPosition == null
+                                            ? 'Enable location to see nearby companies'
+                                            : 'No companies within 70 km',
+                                        style: const TextStyle(
+                                            color: AppColors.textSecondary,
+                                            fontSize: 13),
+                                      ),
+                                      if (_allCompanies.isNotEmpty)
+                                        Padding(
+                                          padding:
+                                              const EdgeInsets.only(top: 4),
+                                          child: Text(
+                                            '${_allCompanies.length} companies shown on map',
+                                            style: const TextStyle(
+                                                fontSize: 12,
+                                                color: AppColors.primary),
+                                          ),
+                                        ),
+                                    ],
+                                  ),
+                                )
                               : ListView.separated(
                                   controller: scrollController,
                                   itemCount: _nearbyCompanies.length,
@@ -388,14 +496,43 @@ class _MapScreenState extends State<MapScreen> {
                                             color: AppColors.textSecondary),
                                       ),
                                       trailing: c.distanceKm != null
-                                          ? Text(
-                                              '${c.distanceKm!.toStringAsFixed(1)} km',
-                                              style: const TextStyle(
-                                                  fontSize: 12,
-                                                  color: AppColors.textSecondary),
+                                          ? Column(
+                                              mainAxisAlignment:
+                                                  MainAxisAlignment.center,
+                                              crossAxisAlignment:
+                                                  CrossAxisAlignment.end,
+                                              children: [
+                                                Text(
+                                                  '${c.distanceKm!.toStringAsFixed(1)} km',
+                                                  style: const TextStyle(
+                                                      fontSize: 13,
+                                                      fontWeight:
+                                                          FontWeight.w600,
+                                                      color: AppColors.primary),
+                                                ),
+                                                if (c.leadStatus != null)
+                                                  Text(
+                                                    c.leadStatus!,
+                                                    style: const TextStyle(
+                                                        fontSize: 10,
+                                                        color: AppColors
+                                                            .textSecondary),
+                                                  ),
+                                              ],
                                             )
                                           : null,
-                                      onTap: () => _openCompany(c),
+                                      onTap: () {
+                                        _openCompany(c);
+                                        if (c.latitude != null &&
+                                            c.longitude != null) {
+                                          _mapController?.animateCamera(
+                                            CameraUpdate.newLatLngZoom(
+                                              LatLng(c.latitude!, c.longitude!),
+                                              14,
+                                            ),
+                                          );
+                                        }
+                                      },
                                     );
                                   },
                                 ),

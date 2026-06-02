@@ -8,10 +8,10 @@ class SentQuotationsScreen extends StatefulWidget {
   const SentQuotationsScreen({super.key});
 
   @override
-  State<SentQuotationsScreen> createState() => _SentQuotationsScreenState();
+  State<SentQuotationsScreen> createState() => SentQuotationsScreenState();
 }
 
-class _SentQuotationsScreenState extends State<SentQuotationsScreen> {
+class SentQuotationsScreenState extends State<SentQuotationsScreen> {
   List<QuotationModel> _quotations = [];
   bool _loading = true;
   String? _error;
@@ -21,6 +21,8 @@ class _SentQuotationsScreenState extends State<SentQuotationsScreen> {
     super.initState();
     _load();
   }
+
+  Future<void> refresh() async => _load();
 
   Future<void> _load() async {
     setState(() {

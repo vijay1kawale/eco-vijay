@@ -54,6 +54,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
     if (confirmed == true && mounted) {
       await AuthService.logout();
+      if (!mounted) return;
       Navigator.pushReplacementNamed(context, '/login');
     }
   }
@@ -76,7 +77,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       child: Container(
                         width: 90,
                         height: 90,
-                        decoration: BoxDecoration(
+                        decoration: const BoxDecoration(
                           color: AppColors.primary,
                           shape: BoxShape.circle,
                         ),
@@ -115,7 +116,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                           borderRadius: BorderRadius.circular(12),
                         ),
                         child: Text(
-                          _user!.role.toUpperCase(),
+                          _user!.displayRole.toUpperCase(),
                           style: const TextStyle(
                               fontSize: 11,
                               color: AppColors.primary,
@@ -146,7 +147,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                             _ProfileRow(
                                 icon: Icons.badge_outlined,
                                 label: 'Role',
-                                value: _user!.role),
+                                value: _user!.displayRole),
                           ],
                         ),
                       ),

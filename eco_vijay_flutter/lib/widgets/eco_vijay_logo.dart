@@ -21,7 +21,15 @@ class EcoVijayLogo extends StatelessWidget {
           ),
         ],
       ),
-      child: Icon(Icons.eco, color: Colors.white, size: size * 0.54),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(size * 0.24),
+        child: Image.asset(
+          'assets/icon/app_icon_fg.png',
+          width: size,
+          height: size,
+          fit: BoxFit.cover,
+        ),
+      ),
     );
   }
 }

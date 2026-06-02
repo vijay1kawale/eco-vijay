@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../theme/app_theme.dart';
 import '../../services/auth_service.dart';
+import '../../services/geofence_service.dart';
 import '../../widgets/eco_vijay_logo.dart';
 
 class LoginScreen extends StatefulWidget {
@@ -36,6 +37,8 @@ class _LoginScreenState extends State<LoginScreen> {
         _emailController.text.trim(),
         _passwordController.text,
       );
+      // FIXED: start geofence service immediately after successful login
+      GeofenceService.start();
       if (mounted) {
         Navigator.pushReplacementNamed(context, '/map');
       }

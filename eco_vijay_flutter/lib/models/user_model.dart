@@ -15,6 +15,16 @@ class UserModel {
     this.createdAt,
   });
 
+  String get displayRole {
+    switch (role) {
+      case 'field_agent': return 'Field Agent';
+      case 'admin': return 'Admin';
+      case 'agent': return 'Agent';
+      default:
+        return role.split('_').map((w) => w.isEmpty ? '' : '${w[0].toUpperCase()}${w.substring(1)}').join(' ');
+    }
+  }
+
   factory UserModel.fromJson(Map<String, dynamic> json) {
     return UserModel(
       id: json['id'].toString(),

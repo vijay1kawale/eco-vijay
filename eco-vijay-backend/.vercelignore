@@ -1,0 +1,5 @@
+node_modules
+.env
+*.csv
+import_companies.js
+gen_icon.js

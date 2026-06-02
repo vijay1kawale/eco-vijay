@@ -9,8 +9,12 @@ class SectionCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final visibleChildren =
-        children.where((w) => w is! SizedBox || (w as SizedBox).height != 0).toList();
+    final visibleChildren = children.where((w) {
+      if (w is SizedBox) {
+        return w.height != 0;
+      }
+      return true;
+    }).toList();
     if (visibleChildren.isEmpty) return const SizedBox.shrink();
 
     return Card(
