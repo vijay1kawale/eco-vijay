@@ -88,6 +88,15 @@ app.use('/api/admin/visits', adminVisitsRoutes);
 app.use('/api/admin', adminRoutes);
 
 // Health check
+app.get('/', (req, res) => {
+  res.json({
+    status: 'ok',
+    app: 'Eco-Vijay Backend',
+    message: 'Use /health for health checks and /api/* for API routes',
+    timestamp: new Date().toISOString(),
+  });
+});
+
 app.get('/health', (req, res) => {
   res.json({ status: 'ok', app: 'Eco-Vijay Backend', timestamp: new Date().toISOString() });
 });

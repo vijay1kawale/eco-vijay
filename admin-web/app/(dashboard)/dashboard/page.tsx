@@ -111,7 +111,10 @@ const STAT_CARDS = (s: Stats) => [
 ];
 
 function timeAgo(isoStr: string): string {
-  const diff = Date.now() - new Date(isoStr).getTime();
+  if (!isoStr) return 'just now';
+  const d = new Date(isoStr);
+  if (isNaN(d.getTime())) return 'just now';
+  const diff = Date.now() - d.getTime();
   const m = Math.floor(diff / 60000);
   if (m < 1) return 'just now';
   if (m < 60) return `${m}m ago`;
