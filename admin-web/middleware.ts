@@ -30,7 +30,6 @@ function verifyJwt(token: string): boolean {
 export function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl;
 
-  // pathname from req.nextUrl has basePath stripped, so /ecovijay-app/login → /login
   if (
     pathname.startsWith('/_next') ||
     pathname.startsWith('/api') ||
@@ -43,19 +42,15 @@ export function middleware(req: NextRequest) {
 
   const token = req.cookies.get('admin_token')?.value;
 
-  // Use req.nextUrl.clone() so Next.js prepends basePath (/ecovijay-app) automatically
   if (!token || !verifyJwt(token)) {
-    const loginUrl = req.nextUrl.clone();
-    loginUrl.pathname = '/login';
+    const loginUrl = new URL('/login', req.url);
     const response = NextResponse.redirect(loginUrl);
     if (token) response.cookies.delete('admin_token');
     return response;
   }
 
   if (pathname === '/') {
-    const dashboardUrl = req.nextUrl.clone();
-    dashboardUrl.pathname = '/dashboard';
-    return NextResponse.redirect(dashboardUrl);
+    return NextResponse.redirect(new URL('/dashboard', req.url));
   }
 
   return NextResponse.next();
