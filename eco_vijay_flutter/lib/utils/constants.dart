@@ -1,9 +1,7 @@
 import 'dart:math' as math;
 
 class AppConstants {
-  // Local dev: Use localhost for web builds, or your PC IP for mobile
-  // For production: 'https://eco-vijay-backend.vercel.app'
-  static const String apiBaseUrl = 'http://localhost:3002';
+  static const String apiBaseUrl = 'https://eco-vijay.vercel.app';
 
   // JWT storage key
   static const String jwtKey = 'eco_vijay_jwt';
