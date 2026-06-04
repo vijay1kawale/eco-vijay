@@ -5,11 +5,5 @@
       "src": "admin-web/package.json",
       "use": "@vercel/next"
     }
-  ],
-  "routes": [
-    {
-      "src": "/(.*)",
-      "dest": "/admin-web/$1"
-    }
   ]
 }
