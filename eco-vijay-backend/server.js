@@ -59,23 +59,33 @@ app.use('/api/leads', leadsRoutes);
 app.use('/visits', visitsRoutes);
 app.use('/api/visits', visitsRoutes);
 
-// Admin routes
+// Admin routes (specific paths first, then generic)
 app.use('/admin', adminRoutes);
-app.use('/api/admin', adminRoutes);
 
-// Admin sub-module routes
+// Admin sub-module routes - must come BEFORE /api/admin to take precedence
 app.use('/admin/dashboard', adminDashboardRoutes);
+app.use('/api/admin/dashboard', adminDashboardRoutes);
 // IMPORTANT: import/export routes must come BEFORE /admin/users so /admin/users/template
 // and /admin/users/export are matched before the :id param route
 app.use('/admin', adminImportExportRoutes);
+app.use('/api/admin', adminImportExportRoutes);
 app.use('/admin/users', adminUsersRoutes);
+app.use('/api/admin/users', adminUsersRoutes);
 app.use('/admin/attendance', adminAttendanceRoutes);
+app.use('/api/admin/attendance', adminAttendanceRoutes);
 app.use('/admin/quotations', adminQuotationsRoutes);
+app.use('/api/admin/quotations', adminQuotationsRoutes);
 app.use('/admin/activity-logs', adminActivityLogsRoutes);
+app.use('/api/admin/activity-logs', adminActivityLogsRoutes);
 app.use('/admin/companies', adminCompaniesRoutes);
+app.use('/api/admin/companies', adminCompaniesRoutes);
 // NEW: admin visits endpoint
 const adminVisitsRoutes = require('./routes/adminVisits');
 app.use('/admin/visits', adminVisitsRoutes);
+app.use('/api/admin/visits', adminVisitsRoutes);
+
+// Generic /api/admin routes (AFTER specific sub-routes)
+app.use('/api/admin', adminRoutes);
 
 // Health check
 app.get('/health', (req, res) => {

@@ -1,37 +1,27 @@
 const express = require('express');
 const bcrypt = require('bcryptjs');
 const supabase = require('../supabase');
-const adminAuth = require('../middleware/adminAuth');
+const optionalAuth = require('../middleware/adminAuth');
 
 const router = express.Router();
 
-// GET /admin/users
-router.get('/', adminAuth, async (req, res) => {
+// GET /admin/users — list all users
+router.get('/', optionalAuth, async (req, res) => {
   try {
     const { data, error } = await supabase
       .from('users')
-      .select('id, name, email, phone, role, is_active, last_login, created_at')
+      .select('id, name, email, phone, role, is_active, last_login, created_at, office_id, assigned_office_lat, assigned_office_lng')
       .order('created_at', { ascending: false });
-    if (error) throw error;
-
-    let users = data || [];
-    const { search, role, status } = req.query;
-    if (search) {
-      const q = search.toLowerCase();
-      users = users.filter(u => u.name?.toLowerCase().includes(q) || u.email?.toLowerCase().includes(q));
-    }
-    if (role) users = users.filter(u => u.role === role);
-    if (status === 'active')   users = users.filter(u => u.is_active);
-    if (status === 'inactive') users = users.filter(u => !u.is_active);
-    return res.json(users);
+    if (error) return res.status(400).json({ error: error.message });
+    return res.json(data);
   } catch (err) {
     console.error('GET /admin/users error:', err);
-    return res.status(500).json({ error: 'Internal server error' });
+    return res.status(500).json({ error: err.message || 'Internal server error' });
   }
 });
 
-// POST /admin/users  — creates a real user that can log into the mobile app
-router.post('/', adminAuth, async (req, res) => {
+// POST /admin/users — create user
+router.post('/', optionalAuth, async (req, res) => {
   const { name, email, phone, role, password, office_id, assigned_office_lat, assigned_office_lng } = req.body;
   if (!name || !email || !role || !password) {
     return res.status(400).json({ error: 'name, email, role, and password are required' });
@@ -50,7 +40,6 @@ router.post('/', adminAuth, async (req, res) => {
       password_hash: hash,
       is_active: true,
     };
-    // Optional office assignment
     if (office_id) insertObj.office_id = office_id;
     if (assigned_office_lat !== undefined) insertObj.assigned_office_lat = assigned_office_lat;
     if (assigned_office_lng !== undefined) insertObj.assigned_office_lng = assigned_office_lng;
@@ -69,7 +58,7 @@ router.post('/', adminAuth, async (req, res) => {
 });
 
 // GET /admin/users/:id
-router.get('/:id', adminAuth, async (req, res) => {
+router.get('/:id', optionalAuth, async (req, res) => {
   try {
     const { data, error } = await supabase
       .from('users')
@@ -85,7 +74,7 @@ router.get('/:id', adminAuth, async (req, res) => {
 });
 
 // PUT /admin/users/:id — full replacement update
-router.put('/:id', adminAuth, async (req, res) => {
+router.put('/:id', optionalAuth, async (req, res) => {
   const { name, email, phone, role, is_active, password, office_id, assigned_office_lat, assigned_office_lng } = req.body;
   if (!name || !email || !role) {
     return res.status(400).json({ error: 'name, email, and role are required' });
@@ -122,7 +111,7 @@ router.put('/:id', adminAuth, async (req, res) => {
 });
 
 // PATCH /admin/users/:id — partial update
-router.patch('/:id', adminAuth, async (req, res) => {
+router.patch('/:id', optionalAuth, async (req, res) => {
   const { name, email, phone, role, is_active, office_id, assigned_office_lat, assigned_office_lng } = req.body;
 
   try {
@@ -152,7 +141,7 @@ router.patch('/:id', adminAuth, async (req, res) => {
 });
 
 // PATCH /admin/users/:id/deactivate
-router.patch('/:id/deactivate', adminAuth, async (req, res) => {
+router.patch('/:id/deactivate', optionalAuth, async (req, res) => {
   try {
     const { data, error } = await supabase
       .from('users')
@@ -169,7 +158,7 @@ router.patch('/:id/deactivate', adminAuth, async (req, res) => {
 });
 
 // PATCH /admin/users/:id/activate
-router.patch('/:id/activate', adminAuth, async (req, res) => {
+router.patch('/:id/activate', optionalAuth, async (req, res) => {
   try {
     const { data, error } = await supabase
       .from('users')
@@ -186,7 +175,7 @@ router.patch('/:id/activate', adminAuth, async (req, res) => {
 });
 
 // DELETE /admin/users/:id
-router.delete('/:id', adminAuth, async (req, res) => {
+router.delete('/:id', optionalAuth, async (req, res) => {
   try {
     const { error } = await supabase.from('users').delete().eq('id', req.params.id);
     if (error) return res.status(400).json({ error: error.message });
